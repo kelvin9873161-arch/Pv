@@ -1,0 +1,82 @@
+name: Concluir Todas as Missoes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  complete-all:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar o Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar Requests
+        run: pip install requests
+
+      - name: Executar o Multi-Quest Completer
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+        run: |
+          python -c "
+          import requests, time, sys, os
+          
+          token = os.environ.get('DISCORD_TOKEN')
+          if not token:
+              print('❌ Erro: DISCORD_TOKEN nao encontrado no GitHub Secrets.')
+              sys.exit(1)
+          
+          headers = {
+              'Authorization': token,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+          
+          url_lista = 'https://' + 'discord.com' + '/api/v9/users/@me/quests'
+          
+          print('Buscando as missoes ativas na sua conta...')
+          try:
+              r = requests.get(url_lista, headers=headers)
+              if r.status_code == 401 or r.status_code == 403:
+                  print(f'❌ Erro de Acesso (Status {r.status_code}): O Discord recusou a conexao. Verifique o seu Token.')
+                  sys.exit(1)
+              elif r.status_code != 200:
+                  print(f'❌ Erro no servidor do Discord. Status: {r.status_code}')
+                  sys.exit(1)
+                  
+              quests_data = r.json()
+              quests = quests_data.get('quests', quests_data) if isinstance(quests_data, dict) else quests_data
+          except Exception as e:
+              print('❌ Erro ao ler os dados do Discord:', e)
+              sys.exit(1)
+          
+          active_quests = [q for q in quests if 'completed_at' not in q or q['completed_at'] is None]
+          
+          if not active_quests:
+              print('🎉 Nenhuma missao pendente encontrada na sua conta! Tudo concluido.')
+              sys.exit(0)
+              
+          print(f'🚀 Sucesso! Encontradas {len(active_quests)} missao(oes) para concluir.')
+          
+          for q in active_quests:
+              q_id = q['id']
+              url_start = 'https://' + 'discord.com' + f'/api/v9/users/@me/quests/{q_id}/start'
+              requests.post(url_start, headers=headers)
+              print(f'-> Ativando simulacao para a Quest ID: {q_id}')
+          
+          print('\n=== Mantendo transmissao ativa por 18 minutes ===')
+          for minuto in range(1, 19):
+              print(f'Tempo decorrido: {minuto} minuto(s)...')
+              for q in active_quests:
+                  q_id = q['id']
+                  url_hb = 'https://' + 'discord.com' + f'/api/v9/users/@me/quests/{q_id}/heartbeat'
+                  try:
+                      requests.post(url_hb, headers=headers, json={'progress': minuto * 60})
+                  except:
+                      pass
+              time.sleep(60)
+              
+          print('\n=== SUCESSO! PROCESSO FINALIZADO! ===')
+          print('Abra seu aplicativo do Discord no celular e resgate seus premios!')
+          "
