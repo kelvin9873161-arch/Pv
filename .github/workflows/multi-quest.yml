@@ -30,16 +30,21 @@ jobs:
           headers = {
               'Authorization': token,
               'Content-Type': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'X-Discord-Locale': 'pt-BR'
           }
           
-          url_lista = 'https://' + 'discord.com' + '/api/v9/users/@me/quests'
+          # URL base da API de Quests do Discord
+          base_url = 'https://discord.com'
           
           print('Buscando as missoes ativas na sua conta...')
           try:
-              r = requests.get(url_lista, headers=headers)
-              if r.status_code == 401 or r.status_code == 403:
-                  print(f'❌ Erro de Acesso (Status {r.status_code}): Token invalido ou recusado pelo Discord.')
+              r = requests.get(base_url, headers=headers)
+              if r.status_code == 404:
+                  print('❌ Erro 404: O endpoint de Quests nao foi encontrado ou mudou de endereço.')
+                  sys.exit(1)
+              elif r.status_code in:
+                  print(f'❌ Erro de Acesso ({r.status_code}): Token invalido, expirado ou recusado.')
                   sys.exit(1)
               elif r.status_code != 200:
                   print(f'❌ Erro no Discord. Status: {r.status_code}')
@@ -54,28 +59,26 @@ jobs:
           active_quests = [q for q in quests if 'completed_at' not in q or q['completed_at'] is None]
           
           if not active_quests:
-              print('🎉 Nenhuma missao pendente encontrada na sua conta! Tudo concluido.')
+              print('🎉 Nenhuma missao pendente encontrada na sua conta!')
               sys.exit(0)
               
-          print(f'🚀 Sucesso! Encontradas {len(active_quests)} missao(oes) para concluir.')
+          print(f'🚀 Encontradas {len(active_quests)} missao(oes) para concluir.')
           
           for q in active_quests:
               q_id = q['id']
-              url_start = 'https://' + 'discord.com' + f'/api/v9/users/@me/quests/{q_id}/start'
-              requests.post(url_start, headers=headers)
+              # Ajuste de rota para os endpoints internos de progresso
+              requests.post(f'{base_url}/{q_id}/start', headers=headers)
               print(f'-> Ativando simulacao para a Quest ID: {q_id}')
           
-          print('\n=== Mantendo transmissao ativa por 18 minutos ===')
+          print('\n=== Simulando progresso por 18 minutos ===')
           for minuto in range(1, 19):
               print(f'Tempo decorrido: {minuto} minuto(s)...')
               for q in active_quests:
-                  q_id = q['id']
-                  url_hb = 'https://' + 'discord.com' + f'/api/v9/users/@me/quests/{q_id}/heartbeat'
                   try:
-                      requests.post(url_hb, headers=headers, json={'progress': minuto * 60})
+                      requests.post(f'{base_url}/{q[\"id\"]}/heartbeat', headers=headers, json={'progress': minuto * 60})
                   except:
                       pass
               time.sleep(60)
               
-          print('\n=== SUCESSO! PROCESSO FINALIZADO! ===')
+          print('\n=== PROCESSO FINALIZADO ===')
           "
